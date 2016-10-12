@@ -16,7 +16,7 @@ static void PrintToken(const Token& tok) {
 
 static void test_list() {
   std::list<int> li;
-  li.push_back();  
+  li.push_back(1);  
 }
 
 
@@ -30,9 +30,9 @@ int main(int argc, char* argv[]) {
   Scanner scanner(text, &fileName, 1);
   while (true) {
     const auto& tok = scanner.Scan();
-    if (tok.tag_ == Token::END)
+    if (tok->tag_ == Token::END)
       break;
-    PrintToken(tok);
+    PrintToken(*tok);
   }
 
   return 0;

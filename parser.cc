@@ -258,6 +258,7 @@ Constant* Parser::ParseFloat(const Token* tok)
   try {
     val = stod(str, &end);
   } catch (const std::out_of_range& oor) {
+    (void)oor.what();
     Error(tok, "float out of range");
   }
 
@@ -301,10 +302,11 @@ Constant* Parser::ParseInteger(const Token* tok)
 {
   const auto& str = tok->str_;
   size_t end = 0;
-  long val = 0;
+  uint64_t val = 0;
   try {
     val = stoull(str, &end, 0);
   } catch (const std::out_of_range& oor) {
+    (void)oor.what();
     Error(tok, "integer out of range");
   }
 
@@ -352,7 +354,7 @@ Constant* Parser::ParseInteger(const Token* tok)
     }
   }
 
-  return Constant::New(tok, tag, val);
+  return Constant::New(tok, tag, (long)val);
 }
 
 
@@ -1273,7 +1275,7 @@ Type* Parser::ParseStructUnionSpec(bool isStruct)
       auto tagIdent = curScope_->FindTagInCurScope(tok);
       if (!tagIdent) {
         //现在是在当前scope第一次看到name，所以现在是第一次定义，连前向声明都没有；
-        auto type = StructType::New(isStruct, tagName.size(), curScope_);
+        auto type = StructType::New(isStruct, (tagName.size() != 0), curScope_);
         auto ident = Identifier::New(tok, type, L_NONE);
         curScope_->InsertTag(ident); 
         return ParseStructUnionDecl(type); //处理反大括号: '}'
@@ -1322,7 +1324,7 @@ Type* Parser::ParseStructUnionSpec(bool isStruct)
 
   //现在，如果是有tag，那它没有前向声明；如果是没有tag，那更加没有前向声明；
   //所以现在是第一次开始定义一个完整的struct/union类型
-  auto type = StructType::New(isStruct, tagName.size(), curScope_);  
+  auto type = StructType::New(isStruct, (tagName.size() != 0), curScope_);  
   return ParseStructUnionDecl(type); //处理反大括号: '}'
 }
 
@@ -1474,9 +1476,9 @@ void Parser::ParseBitField(StructType* structType,
 
   Object* bitField;
   if (tok) {
-    bitField = Object::New(tok, type, 0, L_NONE, begin, width);
+    bitField = Object::New(tok, type, 0, L_NONE, begin, (unsigned char)width);
   } else {
-    bitField = Object::NewAnony(ts_.Peek(), type, 0, L_NONE, begin, width);
+    bitField = Object::NewAnony(ts_.Peek(), type, 0, L_NONE, begin, (unsigned char)width);
   }
   structType->AddBitField(bitField, bitFieldOffset);
 }

@@ -734,7 +734,7 @@ Constant* Constant::New(const Token* tok, int tag, double val)
 Constant* Constant::New(const Token* tok, int tag, const std::string* val)
 {
   auto derived = ArithmType::New(tag);
-  auto type = ArrayType::New(val->size() / derived->Width(), derived);
+  auto type = ArrayType::New((int)(val->size() / derived->Width()), derived);
 
   auto ret = new (constantPool.Alloc()) Constant(tok, type, val);
   ret->pool_ = &constantPool;

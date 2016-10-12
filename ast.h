@@ -230,8 +230,9 @@ private:
 };
 
 
-struct Initializer
+class Initializer
 {
+public:
   //// It could be the object it self or, it will be the member
   //// that was initialized
   Type* type_;

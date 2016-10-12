@@ -24,7 +24,8 @@ typedef std::set<std::string> HideSet;
 typedef std::list<const Token*> TokenList;
 
 
-struct SourceLocation {
+class SourceLocation {
+public:
   const std::string* fileName_;
   const char* lineBegin_;
   unsigned line_;
@@ -36,9 +37,11 @@ struct SourceLocation {
 };
 
 
-struct Token
+class Token
 {
+public:
   friend class Scanner;
+
 public:
   enum {
     /* punctuators */
@@ -315,8 +318,9 @@ private:
 };
 
 
-struct TokenSequence
+class TokenSequence
 {
+public:
   friend class Preprocessor;
 public:
   TokenSequence(): tokList_(new TokenList()),

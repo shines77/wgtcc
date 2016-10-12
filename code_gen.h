@@ -1,14 +1,16 @@
 #ifndef _WGTCC_CODE_GEN_H_
 #define _WGTCC_CODE_GEN_H_
 
+#include <stdint.h>
+
 #include "ast.h"
 #include "visitor.h"
 
 
 class Parser;
-class Addr;
+struct Addr;
 class ROData;
-class Evaluator<Addr>;
+template <> class Evaluator<Addr>;
 struct StaticInitializer;
 
 typedef std::vector<Type*> TypeList;
@@ -16,6 +18,10 @@ typedef std::vector<std::string> LocationList;
 typedef std::vector<ROData> RODataList;
 typedef std::vector<StaticInitializer> StaticInitList;
 
+typedef union { float flt; int val;   } float_int_t;
+typedef union { double dbl; long val; } double_long_t;
+
+typedef ptrdiff_t ssize_t;
 
 enum class ParamClass
 {
@@ -35,8 +41,9 @@ struct ParamLocations {
   size_t xregCnt_;
 };
 
-struct ROData
+class ROData
 {
+public:
   ROData(long ival, int align): ival_(ival), align_(align) {
     label_ = ".LC" + std::to_string(GenTag());
   }
@@ -67,14 +74,14 @@ private:
 
 struct ObjectAddr
 {
-  ObjectAddr(const std::string& label, const std::string& base, int offset)
+  ObjectAddr(const std::string& label, const std::string& base, ssize_t offset)
       : label_(label), base_(base), offset_(offset) {}
 
   std::string Repr() const;
   
   std::string label_;
   std::string base_;
-  int offset_;
+  ssize_t offset_;
   unsigned char bitFieldBegin_ {0};
   unsigned char bitFieldWidth_ {0};
 };
@@ -192,9 +199,9 @@ protected:
   void EmitLoadBitField(const std::string& addr, Object* bitField);
   void EmitStoreBitField(const ObjectAddr& addr, Type* type);
 
-  int Push(const Type* type);
-  int Push(const std::string& reg);
-  int Pop(const std::string& reg);
+  ssize_t Push(const Type* type);
+  ssize_t Push(const std::string& reg);
+  ssize_t Pop(const std::string& reg);
 
   void Spill(bool flt);
 
@@ -210,11 +217,11 @@ protected:
 
   //static std::string _cons;
   static RODataList rodatas_;
-  static int offset_;
+  static ssize_t offset_;
 
   // The address that store the register %rdi,
   //     when the return value is a struct/union
-  static int retAddrOffset_;
+  static ssize_t retAddrOffset_;
   static FuncDef* curFunc_;
 
   static std::vector<Declaration*> staticDecls_;

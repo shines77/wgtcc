@@ -104,7 +104,16 @@ public:
   virtual std::string Str() const = 0; 
   virtual int Width() const = 0;
   virtual int Align() const { return Width(); }
+
   static int MakeAlign(int offset, int align) {
+    if ((offset % align) == 0)
+      return offset;
+    if (offset >= 0)
+      return offset + align - (offset % align);
+    else
+      return offset - align - (offset % align);
+  } 
+  static int64_t MakeAlign(int64_t offset, int align) {
     if ((offset % align) == 0)
       return offset;
     if (offset >= 0)
@@ -168,7 +177,7 @@ public:
   virtual VoidType* ToVoid() { return this; }
   virtual const VoidType* ToVoid() const { return this; }
   virtual bool Compatible(const Type& other) const {
-    return other.ToVoid();
+    return (other.ToVoid() != nullptr);
   }
 
   virtual int Width() const {
@@ -202,12 +211,12 @@ public:
   virtual std::string Str() const;
   virtual bool IsScalar() const { return true; }
   virtual bool IsInteger() const { return !IsFloat() && !IsComplex(); }
-  virtual bool IsUnsigned() const { return tag_ & T_UNSIGNED; }
+  virtual bool IsUnsigned() const { return ((tag_ & T_UNSIGNED) != 0); }
   virtual bool IsFloat() const {
     return (tag_ & T_FLOAT) || (tag_ & T_DOUBLE);
   }
-  virtual bool IsBool() const { return tag_ & T_BOOL; }
-  bool IsComplex() const { return tag_ & T_COMPLEX; }
+  virtual bool IsBool() const { return ((tag_ & T_BOOL) != 0); }
+  bool IsComplex() const { return ((tag_ & T_COMPLEX) != 0); }
   int Tag() const { return tag_; }
   int Rank() const;
   static ArithmType* IntegerPromote(ArithmType* type) {
@@ -270,7 +279,7 @@ public:
   virtual bool Compatible(const Type& other) const;
   virtual int Width() const { return 8; }
   virtual bool IsScalar() const { return true; }
-  virtual bool IsVoidPointer() const { return derived_->ToVoid(); }
+  virtual bool IsVoidPointer() const { return (derived_->ToVoid() != nullptr); }
   virtual std::string Str() const {
     return derived_->Str() + "*:" + std::to_string(Width());
   }

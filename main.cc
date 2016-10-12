@@ -11,7 +11,9 @@
 #include <string>
 
 #include <fcntl.h>
+#if defined(__linux__) || defined(__GUNC__)
 #include <unistd.h>
+#endif
 
 
 std::string program;
@@ -101,8 +103,15 @@ int main(int argc, char* argv[])
   // change current directory
   auto tmpOutFileName = outFileName;
   outFileName = inFileName;
-  std::string dir = "./";  
+#if defined(_WIN32) || defined(OS_WINDOWS) || defined(_WINDOWS_)
+  std::string dir = ".\\";
+#else
+  std::string dir = "./";
+#endif
   auto pos = inFileName.rfind('/');
+  if (pos == std::string::npos) {
+      pos = inFileName.rfind('\\');
+  }
   
   if (pos != std::string::npos) {
     dir = inFileName.substr(0, pos + 1);

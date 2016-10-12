@@ -1,6 +1,12 @@
-#include <stdio.h>
+//#include <stdio.h>
 
-int main() {
+void putchar(char c)
+{
+    // Do nothing!!
+}
+
+int main()
+{
   for (float y = 1.5f; y > -1.5f; y -= 0.1f) {
     for (float x = -1.5f; x < 1.5f; x += 0.05f) {
       float a = x * x + y * y - 1;

@@ -5,7 +5,9 @@
 
 #include <ctime>
 #include <fcntl.h>
+#if defined(__linux__) || defined(__GUNC__)
 #include <unistd.h>
+#endif
 #include <unordered_map>
 
 
@@ -498,7 +500,7 @@ void Preprocessor::ParseIf(TokenSequence ls)
   Parser parser(ts);
   auto expr = parser.ParseExpr();
   int cond = Evaluator<long>().Eval(expr);
-  ppCondStack_.push({Token::PP_IF, NeedExpand(), cond});
+  ppCondStack_.push({Token::PP_IF, NeedExpand(), (cond != 0)});
 }
 
 
@@ -517,7 +519,7 @@ void Preprocessor::ParseIfdef(TokenSequence ls)
 
   int cond = FindMacro(ident->str_) != nullptr;
 
-  ppCondStack_.push({Token::PP_IFDEF, NeedExpand(), cond});
+  ppCondStack_.push({Token::PP_IFDEF, NeedExpand(), (cond != 0)});
 }
 
 
@@ -575,7 +577,7 @@ void Preprocessor::ParseElif(TokenSequence ls)
   int cond = Evaluator<long>().Eval(expr);
 
   cond = cond && !top.cond_;
-  ppCondStack_.push({Token::PP_ELIF, true, cond});
+  ppCondStack_.push({Token::PP_ELIF, true, (cond != 0)});
 }
 
 
@@ -757,7 +759,67 @@ void Preprocessor::IncludeFile(TokenSequence& is, const std::string* fileName)
   is.begin_ = ts.begin_;
 }
 
+#if defined(_WIN32) || defined(OS_WINDOWS) || defined(_WINDOWS_)
 
+std::string* Preprocessor::SearchFile(
+    const std::string& name,
+    bool libHeader,
+    bool next,
+    const std::string* curPath)
+{
+  PathList::iterator begin, end;
+  if (libHeader && !next) {
+    auto iter = searchPathList_.begin();
+    for (; iter != searchPathList_.end(); iter++) {
+      auto dd = ::fopen(iter->c_str(), "rb");
+      //if (dd == nullptr) // TODO(wgtdkp): or ensure it before preprocessing
+      //  continue;
+      std::string sub_name = iter->c_str();
+      char last_char = sub_name[sub_name.size() - 1];
+      if (last_char != '\\' && last_char != '/')
+        sub_name += '\\';
+      sub_name += name;
+      auto fd = ::fopen(sub_name.c_str(), "rb");
+      if (fd != nullptr) {
+        ::fclose(fd);
+        return new std::string(sub_name.c_str());
+      }
+      if (dd != nullptr)
+        ::fclose(dd);
+    }
+  } else {
+    auto iter = searchPathList_.rbegin();
+    for (; iter != searchPathList_.rend(); iter++) {
+      auto dd = ::fopen(iter->c_str(), "rb");
+      //if (dd == nullptr) // TODO(wgtdkp): or ensure it before preprocessing
+      //  continue;
+      std::string sub_name = iter->c_str();
+      char last_char = sub_name[sub_name.size() - 1];
+      if (last_char != '\\' && last_char != '/')
+        sub_name += '\\';
+      sub_name += name;
+      auto fd = ::fopen(sub_name.c_str(), "rb");
+      if (fd != nullptr) {
+        ::fclose(fd);
+        auto path = sub_name;
+        if (next) {
+          assert(curPath);
+          if (path != *curPath)
+            continue;
+          else 
+            next = false;
+        } else {
+          return new std::string(path);
+        }
+      }
+      if (dd != nullptr)
+        ::fclose(dd);
+    }
+  }
+
+  return nullptr;
+}
+#else
 std::string* Preprocessor::SearchFile(
     const std::string& name,
     bool libHeader,
@@ -802,6 +864,7 @@ std::string* Preprocessor::SearchFile(
 
   return nullptr;
 }
+#endif
 
 
 void Preprocessor::AddMacro(const std::string& name,

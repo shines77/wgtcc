@@ -113,7 +113,17 @@ Token* Scanner::Scan(bool ws) {
       return MakeToken('.');
     }
     return MakeToken(c);
-  case '0' ... '9': return SkipNumber();	
+  case '0':
+  case '1':
+  case '2':
+  case '3':
+  case '4':
+  case '5':
+  case '6':
+  case '7':
+  case '8':
+  case '9':
+    return SkipNumber();	
   case 'u': case 'U': case 'L': {
     /*auto enc = */ScanEncoding(c);
     if (Try('\'')) return SkipCharacter();
@@ -122,17 +132,24 @@ Token* Scanner::Scan(bool ws) {
   }
   case '\'': return SkipCharacter();
   case '\"': return SkipLiteral();
+  /*
   case 'a' ... 't': case 'v' ... 'z': case 'A' ... 'K':
   case 'M' ... 'T': case 'V' ... 'Z': case '_': case '$':
   case 0x80 ... 0xfd:
     return SkipIdentifier();
+  //*/
   case '\\':
     // Universal character name is allowed in identifier
     if (Test('u') || Test('U'))
       return SkipIdentifier();
     return MakeToken(Token::INVALID);
   case '\0': return MakeToken(Token::END);
-  default: return MakeToken(Token::INVALID);
+  default:
+    // 'u', 'U', 'L' already have filter.
+    if (((c >= 'a' && c <= 0xfd)) || (c == '_' || c == '$')) {
+      return SkipIdentifier();
+    }
+    return MakeToken(Token::INVALID);
   }
 }
 
@@ -299,7 +316,14 @@ int Scanner::ScanEscaped() {
   // Non-standard GCC extention
   case 'e': return '\033';
   case 'x': return ScanHexEscaped();
-  case '0' ... '7': return ScanOctEscaped(c);
+  case '0':
+  case '1':
+  case '2':
+  case '3':
+  case '4':
+  case '5':
+  case '6':
+  case '7': return ScanOctEscaped(c);
   case 'u': return ScanUCN(4);
   case 'U': return ScanUCN(8);
   default: Error(loc_, "unrecognized escape character '%c'", c);
@@ -352,12 +376,24 @@ int Scanner::ScanUCN(int len) {
 
 
 int Scanner::XDigit(int c) {
+  if (c >= '0' && c <= '9')
+    return (c - '0');
+  else if (c >= 'a' && c <= 'z')
+    return (c - 'a' + 10);
+  else if (c >= 'A' && c <= 'Z')
+    return (c - 'A' + 10);
+  else {
+      assert(false);
+      return c;
+  }
+/*
   switch (c) {
   case '0' ... '9': return c - '0';
   case 'a' ... 'z': return c - 'a' + 10;
   case 'A' ... 'Z': return c - 'A' + 10;
   default: assert(false); return c;
   }
+*/
 }
 
 

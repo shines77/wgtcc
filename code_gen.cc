@@ -19,8 +19,8 @@ FILE* Generator::outFile_ = nullptr;
 //std::string Generator::_cons;
 RODataList Generator::rodatas_;
 std::vector<Declaration*> Generator::staticDecls_;
-int Generator::offset_ = 0;
-int Generator::retAddrOffset_ = 0;
+ssize_t Generator::offset_ = 0;
+ssize_t Generator::retAddrOffset_ = 0;
 FuncDef* Generator::curFunc_ = nullptr;
 
 
@@ -116,11 +116,12 @@ std::string Generator::ConsLabel(Constant* cons)
     return "$" + std::to_string(cons->IVal());
   } else if (cons->Type()->IsFloat()) {
     double valsd = cons->FVal();
-    float  valss = valsd;
+    float  valss = static_cast<float>(valsd);
     // TODO(wgtdkp): Add rodata
     auto width = cons->Type()->Width();
-    long val = width == 4 ? (union {float valss; int val;}){valss}.val:
-        (union {double valsd; long val;}){valsd}.val;
+    float_int_t  fvalss{ valss };
+    double_long_t dvalss{ valsd };
+    long val = (width == 4) ? fvalss.val : dvalss.val;
     const ROData& rodata = ROData(val, width);
     rodatas_.push_back(rodata);
     return rodata.label_;
@@ -132,7 +133,7 @@ std::string Generator::ConsLabel(Constant* cons)
 }
 
 
-static const char* GetLoad(int width, bool flt=false)
+static const char* GetLoad(int width, bool flt = false)
 {
   switch (width) {
   case 1: return "movzbq";
@@ -203,7 +204,7 @@ static const char* GetSrc(int width, bool flt)
 
 
 // The 'reg' always be 8 bytes  
-int Generator::Push(const std::string& reg)
+ssize_t Generator::Push(const std::string& reg)
 {
   offset_ -= 8;
   auto mov = reg[0] == 'x' ? "movsd": "movq";
@@ -212,7 +213,7 @@ int Generator::Push(const std::string& reg)
 }
 
 
-int Generator::Push(const Type* type)
+ssize_t Generator::Push(const Type* type)
 {
   if (type->IsFloat()) {
     return Push("xmm0");
@@ -228,7 +229,7 @@ int Generator::Push(const Type* type)
 
 
 // The 'reg' must be 8 bytes
-int Generator::Pop(const std::string& reg)
+ssize_t Generator::Pop(const std::string& reg)
 {
   auto mov = reg[0] == 'x' ? "movsd": "movq";
   Emit("%s %d(#rbp), #%s", mov, offset_, reg.c_str());
@@ -827,7 +828,7 @@ void Generator::VisitDeclaration(Declaration* decl)
       addr.bitFieldBegin_ = init.bitFieldBegin_;
       addr.bitFieldWidth_ = init.bitFieldWidth_;
       if (lastEnd != addr.offset_)
-        EmitZero({"", "rbp", lastEnd}, addr.offset_ - lastEnd);
+        EmitZero({"", "rbp", lastEnd}, (int)(addr.offset_ - lastEnd));
       VisitExpr(init.expr_);
       if (init.type_->IsScalar()) {
         EmitStore(addr, init.type_);
@@ -836,7 +837,7 @@ void Generator::VisitDeclaration(Declaration* decl)
       } else {
         assert(false);
       }
-      lastEnd = addr.offset_ + init.type_->Width();
+      lastEnd = (int)(addr.offset_ + init.type_->Width());
     }
     auto objEnd = obj->Offset() + obj->Type()->Width();
     if (lastEnd != objEnd)
@@ -990,7 +991,7 @@ public:
 
 void Generator::AllocObjects(Scope* scope, const FuncDef::ParamList& params)
 {
-  int offset = offset_;
+  ssize_t offset = offset_;
 
   auto paramSet = std::set<Object*>(params.begin(), params.end());
   std::priority_queue<Object*, std::vector<Object*>, Comp> heap;
@@ -1009,7 +1010,7 @@ void Generator::AllocObjects(Scope* scope, const FuncDef::ParamList& params)
 
     offset -= obj->Type()->Width();
     offset = Type::MakeAlign(offset, obj->Align());
-    obj->SetOffset(offset);
+    obj->SetOffset((int)offset);
   }
 
   offset_ = offset;
@@ -1035,7 +1036,7 @@ void Generator::GetParamRegOffsets(int& gpOffset, int& fpOffset,
   TypeList types;
   for (auto param: funcType->Params())
     types.push_back(param->Type());
-  auto locations = GetParamLocations(types, funcType->Derived());
+  auto locations = GetParamLocations(types, (funcType->Derived() != nullptr));
   gpOffset = 0;
   fpOffset = 48;
   overflow = 16;
@@ -1166,20 +1167,20 @@ void Generator::VisitFuncCall(FuncCall* funcCall)
   for (auto arg: funcCall->args_)
     types.push_back(arg->Type());
   
-  const auto& locations = GetParamLocations(types, retType);
+  const auto& locations = GetParamLocations(types, (retType != nullptr));
   // Align stack frame by 16 bytes
   const auto& locs = locations.locs_;
   auto byMemCnt = locs.size() - locations.regCnt_ - locations.xregCnt_;
 
-  offset_ = Type::MakeAlign(offset_ - byMemCnt * 8, 16) + byMemCnt * 8;  
-  for (int i = locs.size() - 1; i >=0; --i) {
+  offset_ = Type::MakeAlign((ssize_t)(offset_ - byMemCnt * 8), 16) + byMemCnt * 8;  
+  for (ssize_t i = locs.size() - 1; i >=0; --i) {
     if (locs[i][0] == 'm') {
       Visit(funcCall->args_[i]);
       Push(funcCall->args_[i]->Type());
     }
   }
 
-  for (int i = locs.size() - 1; i >= 0; i--) {
+  for (ssize_t i = locs.size() - 1; i >= 0; i--) {
     if (locs[i][0] == 'm')
       continue;
     Visit(funcCall->args_[i]);
@@ -1272,7 +1273,7 @@ void Generator::VisitFuncDef(FuncDef* funcDef)
 
   auto& params = funcDef->Type()->Params();
   // Arrange space to store params passed by registers
-  bool retStruct = funcDef->Type()->Derived()->ToStruct();
+  bool retStruct = (funcDef->Type()->Derived()->ToStruct() != nullptr);
   TypeList types;
   for (auto param: params)
     types.push_back(param->Type());
@@ -1286,8 +1287,8 @@ void Generator::VisitFuncDef(FuncDef* funcDef)
       retAddrOffset_ = offset_;
       offset_ += 8;
     }
-    int regOffset = offset_;
-    int xregOffset = offset_ + 48;
+    int regOffset = (int)offset_;
+    int xregOffset = (int)(offset_ + 48);
     int byMemOffset = 16;
     for (size_t i = 0; i < locs.size(); i++) {
       if (locs[i][0] == 'm') {
@@ -1318,7 +1319,7 @@ void Generator::VisitFuncDef(FuncDef* funcDef)
         byMemOffset = Type::MakeAlign(byMemOffset, 8);
         continue;
       }
-      params[i]->SetOffset(Push(locs[i]));
+      params[i]->SetOffset((int)Push(locs[i]));
     }
   }
 
@@ -1405,7 +1406,7 @@ void Generator::EmitLoad(const std::string& addr, Type* type)
 void Generator::EmitLoad(const std::string& addr, int width, bool flt)
 {
   auto load = GetLoad(width, flt);
-  auto des = GetDes(width == 4 ? 4: 8, flt);
+  auto des = GetDes((width == 4) ? 4 : 8, flt);
   Emit("%s %s, #%s", load, addr.c_str(), des);
 }
 
@@ -1592,7 +1593,8 @@ StaticInitializer Generator::GetStaticInit(
     return {offset, 1, val, ""};
   } else if (init->type_->IsFloat()) {
     auto val = Evaluator<double>().Eval(init->expr_);
-    auto lval = (union {double val; long lval;}){val}.lval;
+    double_long_t dval{ val };
+    auto lval = dval.val;
     return {init->offset_, width, lval, ""};
   } else if (init->type_->ToPointer()) {
     auto addr = Evaluator<Addr>().Eval(init->expr_);

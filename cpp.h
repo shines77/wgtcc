@@ -21,6 +21,8 @@ typedef std::map<std::string, TokenSequence> ParamMap;
 typedef std::stack<CondDirective> PPCondStack;
 typedef std::list<std::string> PathList;
 
+#define open _open
+
 
 class Macro
 {
